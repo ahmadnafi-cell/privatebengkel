@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inbound Slot Capacity</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f3f6fa;--card:#fff;--ink:#1d2433;--muted:#5f6675;--faint:#8b91a0;--line:#e9e9e9;--head:#fafafa;
+  --primary:#246ee5;--primary-soft:#e9f1fc;--primary-line:#bdd4fa;--info:#f4f9ff;--navy:#291d80;
+  --red:#f94d63;--red-soft:#fff1f3;--red-line:#fcc7cf;
+  --amber:#d98200;--amber-soft:#fff7e8;--amber-line:#f6d9a6;
+  --green:#14a05a;--green-soft:#eaf8f0;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Plus Jakarta Sans","Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.cal,.kpi .v,.list td.n,.tot .nums,.cell .nums{font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+button,select{font:inherit}
+.hidden{display:none!important}
+
+.top{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);padding:10px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{font-weight:800;color:var(--navy);font-size:16px;letter-spacing:-.2px}
+.srcs{display:flex;gap:8px;flex-wrap:wrap}
+.src{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:12px;color:var(--muted);background:#fff}
+.src .dot{width:8px;height:8px;border-radius:50%;background:#c4c4c4}
+.src.on .dot{background:var(--green)}
+.src.off{border-color:var(--amber-line);background:var(--amber-soft);color:#8a5300}
+.src.off .dot{background:var(--amber)}
+.spacer{flex:1}
+.btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:7px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;white-space:nowrap}
+.btn:hover{border-color:#c4c4c4}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.outline{border-color:var(--primary);color:var(--primary)}
+.btn.ok{background:var(--green);border-color:var(--green);color:#fff}
+.btn.small{padding:5px 10px;font-size:12px}
+.btn.link{border:none;background:none;color:var(--primary);padding:4px 0}
+.btn.danger{color:var(--red);border-color:var(--red-line)}
+
+main{max-width:1360px;margin:0 auto;padding:18px 24px 60px}
+h1.page{font-size:22px;margin:0 0 16px;font-weight:800;letter-spacing:-.4px}
+
+/* upload */
+.empty{margin:40px auto;max-width:680px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:28px}
+.empty h2{margin:0 0 6px;font-size:18px}
+.empty p{margin:0 0 16px;color:var(--muted)}
+.drop{border:2px dashed var(--primary-line);background:var(--info);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:.15s}
+.drop.hover{border-color:var(--primary);background:var(--primary-soft)}
+.drop b{color:var(--primary)}
+.need{margin-top:16px;display:grid;gap:8px}
+.need .it{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.need .it .dot{width:10px;height:10px;border-radius:50%;background:#c4c4c4;margin-top:4px;flex:none}
+.need .it.on .dot{background:var(--green)}
+.need .it small{color:var(--muted);display:block}
+.err{color:var(--red);margin-top:12px;font-weight:700}
+
+/* filters */
+.filters{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;color:var(--ink)}
+.field label i{color:var(--red);font-style:normal}
+.field select{min-width:240px;padding:9px 12px;border:1px solid #d8d8d8;border-radius:6px;background:#fff;color:var(--ink)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:#fff;border-radius:6px;padding:7px 10px;font-size:12px;cursor:pointer;color:var(--faint);text-decoration:line-through}
+.chip.on{color:var(--primary);text-decoration:none;border-color:var(--primary-line);background:var(--primary-soft)}
+
+.strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.kpi{background:var(--info);border:1px solid var(--primary-line);border-radius:8px;padding:12px 16px}
+.kpi .k{font-size:12px;font-weight:600;color:var(--muted)}
+.kpi .v{font-size:26px;font-weight:800;margin-top:2px;letter-spacing:-.6px;line-height:1.2}
+.kpi .s{font-size:12px;color:var(--muted)}
+
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:14px;background:#fff;border-radius:8px 8px 0 0;padding:0 8px}
+.tabs button{border:none;background:none;padding:12px 16px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--primary);border-bottom-color:var(--primary)}
+.count{display:inline-block;min-width:20px;padding:1px 7px;margin-left:6px;border-radius:999px;font-size:11px;background:#eef0f3;color:var(--muted)}
+.count.bad{background:var(--red);color:#fff}
+.count.acc{background:var(--primary);color:#fff}
+
+.note{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-bottom:12px;color:var(--muted);font-size:12px}
+.note.warn{background:var(--amber-soft);border-color:var(--amber-line);color:#7a4a00}
+details.note summary{cursor:pointer;color:var(--ink);font-weight:700}
+details.note ul{margin:8px 0 2px;padding-left:18px}
+details.note li{margin:3px 0}
+
+/* calendar grid (Astro style) */
+.calwrap{background:#fff;border:1px solid var(--line);border-radius:8px;overflow-x:auto;margin-bottom:14px}
+table.cal{border-collapse:collapse;width:100%;min-width:940px;table-layout:fixed}
+.cal th,.cal td{border:1px solid var(--line);vertical-align:top;padding:10px 10px}
+.cal tr:first-child th{border-top:none}
+.cal th:first-child,.cal td:first-child{border-left:none}
+.cal th:last-child,.cal td:last-child{border-right:none}
+.cal tr:last-child td{border-bottom:none}
+.cal thead th{background:var(--head);font-weight:700;font-size:13px}
+.cal .corner{width:190px;vertical-align:middle;text-align:left}
+.cal .month{text-align:center;color:var(--muted);font-weight:700}
+.cal .dayh{display:flex;justify-content:space-between}
+.cal .dayh span:last-child{color:var(--muted);font-weight:600}
+.cal td.rowh{background:var(--head);position:relative;padding-left:18px;vertical-align:middle}
+.cal td.rowh .bar{position:absolute;left:0;top:12px;bottom:12px;width:4px;border-radius:0 4px 4px 0;background:var(--primary)}
+.cal td.rowh b{display:block;font-size:13px}
+.cal td.rowh span{font-size:12px;color:var(--muted)}
+.tot{border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:#fff}
+.tot .l{font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.tot.bad .l{color:var(--red);font-weight:700}
+.tot.over .l{color:var(--amber);font-weight:700}
+.tot .nums{display:flex;justify-content:space-between;font-weight:800;margin-top:4px;font-size:12px}
+.tot .rr{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.3}
+.info{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1.5px solid currentColor;font-size:10px;font-weight:800;cursor:help;flex:none}
+.cell{cursor:pointer;transition:background .12s}
+.cell:hover{background:var(--primary-soft)}
+.cell.bad{background:var(--red-soft)} .cell.bad:hover{background:#ffe5ea}
+.cell.over{background:var(--amber-soft)} .cell.over:hover{background:#fff0d3}
+.cell.changed{box-shadow:inset 0 0 0 2px var(--primary)}
+.cell .cap{font-size:12px;color:var(--ink)}
+.cell .nums{display:flex;justify-content:space-between;font-weight:800;font-size:12px}
+.cell .nums .hi{color:var(--red)}
+.cell .po{display:flex;justify-content:space-between;font-size:12px;margin-top:2px}
+.cell .po span:last-child{font-weight:700}
+.cell .foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:4px;flex-wrap:wrap}
+.cell .pct{font-weight:800;font-size:15px;letter-spacing:-.3px}
+.cell.ok .pct{color:var(--green)} .cell.over .pct{color:var(--amber)} .cell.bad .pct{color:var(--red)}
+.cell .was{font-size:11px;color:var(--faint);font-weight:600}
+.meter{position:relative;height:6px;background:#eef0f3;border-radius:99px;margin-top:6px}
+.meter .fill{position:absolute;left:0;top:0;bottom:0;border-radius:99px}
+.meter .ghost{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:rgba(0,0,0,.10)}
+.meter .mk{position:absolute;top:-3px;bottom:-3px;width:2px;background:#646464}
+.meter .mk.lim{background:var(--red);opacity:.7}
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap}
+.tag.ok{background:var(--green-soft);color:var(--green)}
+.tag.over{background:#ffeccc;color:#8a5300}
+.tag.bad{background:var(--red);color:#fff}
+.tag.acc{background:var(--primary-soft);color:var(--primary)}
+.tag.grey{background:#eef0f3;color:var(--muted)}
+.tag.fit{background:var(--green-soft);color:var(--green)}
+.tag.nofit{background:var(--red-soft);color:var(--red)}
+.cal th.dbad{background:#ffeef1;border-left:2px solid var(--red);border-right:2px solid var(--red);border-top:2px solid var(--red)}
+.cal th.dbad .dayh span{color:var(--red)}
+.cal td.colbad{border-left:2px solid var(--red);border-right:2px solid var(--red)}
+.cal tr:last-child td.colbad{border-bottom:2px solid var(--red)}
+.cal td.colbad.cell{background:#fff8f9}
+.cal td.colbad.cell.over{background:#fff3e3}
+.cal td.colbad.cell.bad{background:#ffe1e7}
+.cal th.dfix{background:#eefaf3}
+.brk,.fix{margin-top:6px;font-size:11px;font-weight:700;border-radius:4px;padding:3px 7px;display:inline-block}
+.brk{background:var(--red);color:#fff}
+.fix{background:var(--green);color:#fff}
+.tot.bad{background:var(--red);border-color:var(--red);color:#fff}
+.tot.bad .l,.tot.bad .rr,.tot.bad .nums span{color:#fff!important}
+.tot.over{background:var(--amber-soft);border-color:var(--amber-line)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:-4px 0 14px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid var(--line)}
+
+/* recommendations */
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.toolbar .txt{color:var(--muted);flex:1;min-width:260px}
+.prob{background:#fff;border:1px solid var(--line);border-left:4px solid var(--red);border-radius:8px;padding:14px 16px;margin-bottom:12px}
+.prob h3{margin:0;font-size:15px}
+.prob .why{color:var(--muted);margin:4px 0 8px}
+.prob .needq{font-weight:700;margin-bottom:6px}
+.vrow{display:grid;grid-template-columns:minmax(0,1.3fr) 110px minmax(0,1.4fr) 120px;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:8px;margin-top:8px;background:#fff}
+.vrow.done{background:var(--green-soft);border-color:#bfe5cd}
+.vn{font-weight:700}
+.vp{font-size:12px;color:var(--muted);word-break:break-all}
+.pref{font-size:12px;color:var(--primary);margin-top:2px}
+.pref.none{color:var(--amber)}
+.vrow select,.drawer select,td select{width:100%;padding:7px 8px;border:1px solid #d8d8d8;border-radius:6px;background:#fff;font-size:12px}
+.vrow .warnnote{grid-column:1/-1;font-size:12px;color:#8a5300;background:var(--amber-soft);border-radius:6px;padding:6px 10px}
+.okbox{background:#fff;border:1px solid var(--line);border-radius:8px;padding:40px;text-align:center;color:var(--muted)}
+.okbox b{color:var(--green);font-size:16px;display:block;margin-bottom:4px}
+
+.panel{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:14px}
+.panel h2{font-size:15px;margin:0 0 2px}
+.panel .sub{color:var(--muted);margin:0 0 10px}
+table.list{border-collapse:collapse;width:100%}
+.list th,.list td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+.list th{font-size:12px;color:var(--muted);font-weight:600;background:var(--head)}
+.list td.n,.list th.n{text-align:right}
+.polist{font-size:11px;color:var(--muted);word-break:break-all;margin-top:2px}
+
+/* drawer */
+.shade{position:fixed;inset:0;background:rgba(33,33,33,.35);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(860px,100vw);background:#fff;z-index:41;box-shadow:-10px 0 30px rgba(0,0,0,.12);display:flex;flex-direction:column}
+.drawer .dh{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start;background:var(--head)}
+.drawer .dh h2{margin:0;font-size:16px}
+.drawer .dh p{margin:4px 0 0;color:var(--muted)}
+.drawer .db{padding:14px 20px;overflow:auto;flex:1}
+.drawer .x{margin-left:auto}
+.mv{display:flex;gap:6px;align-items:center}
+.mv select{min-width:0}
+
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:60;opacity:0;transition:.2s;pointer-events:none}
+.toast.show{opacity:1}
+
+@media(max-width:900px){
+  .strip{grid-template-columns:repeat(2,1fr)}
+  .vrow{grid-template-columns:1fr}
+  main,.top{padding-left:16px;padding-right:16px}
+  .field select{min-width:0;width:100%}
+  .field{width:100%}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <span class="brand">Inbound Slot Capacity</span>
+  <div class="srcs" id="srcs"></div>
+  <span class="spacer"></span>
+  <button class="btn" data-act="upload">Upload file</button>
+  <button class="btn primary" data-act="share">Copy share link</button>
+</header>
+
+<main>
+  <section id="empty" class="empty">
+    <h2 id="emptyTitle">Upload your data</h2>
+    <p>Upload the Excel file that has both tabs, or upload two CSV files. The page recognises each tab by its column names.</p>
+    <div class="drop" id="drop" data-act="upload"><b>Click to choose files</b> or drop them here<br><span style="font-size:12px;color:var(--muted)">.xlsx, .xls or .csv · you can select more than one file</span></div>
+    <div class="need">
+      <div class="it" id="needPo"><span class="dot"></span><div><b>Inbound PO schedule</b> (Sheet1)<small>Needs: Capacity Handler Date, slot name, start_at, end_at, po_number, status, incoming_qty, Vendor ID, vendor, destination_id, destination_name, max_timeslot_po_qty</small></div></div>
+      <div class="it" id="needPref"><span class="dot"></span><div><b>Vendor delivery preference</b> (Sheet2, optional but recommended)<small>Needs: Vendor ID, inbound days, new_inbound_hours, destination_id. Used so a vendor is only moved to a day and time it can deliver.</small></div></div>
+    </div>
+    <div class="err" id="err"></div>
+  </section>
+
+  <section id="app" class="hidden">
+    <h1 class="page">Inbound Slot Capacity Check</h1>
+    <div class="filters">
+      <div class="field"><label>Warehouse/Hub <i>*</i></label><select id="whSel"></select></div>
+      <div class="field"><label>PO status counted</label><div class="chips" id="statusChips"></div></div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="overview">Overview</button>
+      <button data-tab="recs">Recommendations <span class="count" id="cntRecs">0</span></button>
+      <button data-tab="sim">Simulation <span class="count" id="cntSim">0</span></button>
+    </nav>
+    <div id="view"></div>
+  </section>
+</main>
+
+<div id="drawerWrap" class="hidden">
+  <div class="shade" data-act="close"></div>
+  <div class="drawer">
+    <div class="dh"><div><h2 id="dTitle"></h2><p id="dSub"></p></div><button class="btn x" data-act="close">Close</button></div>
+    <div class="db" id="dBody"></div>
+  </div>
+</div>
+
+<input type="file" id="file" accept=".csv,.xlsx,.xls" multiple class="hidden">
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== RULES ===================== */
+const RULES = {
+  A: {1: 1.25, 2: 1.00, 3: 1.25},   // Slot 1 is over
+  B: {1: 1.00, 2: 1.33, 3: 1.00},   // Slot 2 is over
+  N: {1: 1.00, 2: 1.00, 3: 1.25}    // neither Slot 1 nor Slot 2 is over
+};
+const RULE_TEXT = {
+  A: 'Slot 1 is over, so Slot 2 must stay at or below 100%. Slot 3 can go up to 125%.',
+  B: 'Slot 2 is over, so Slot 1 and Slot 3 must stay at or below 100%.',
+  N: 'Slot 1 and Slot 2 are not over. Slot 3 can go up to 125%.'
+};
+const RULE_SHORT = { A: 'Slot 1 over → Slot 2 max 100%', B: 'Slot 2 over → Slot 1 & 3 max 100%', N: 'Slot 1 & 2 ≤100% · Slot 3 max 125%' };
+const STATUS_LABEL = { ok: 'OK', over: 'Over, allowed', bad: 'Too full' };
+const EPS = 1e-9, METER_MAX = 1.4;
+const DAY_IDX = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, minggu: 0, senin: 1, selasa: 2, rabu: 3, kamis: 4, jumat: 5, "jum'at": 5, sabtu: 6 };
+const DAY_NAME = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/* ===================== STATE ===================== */
+let RAW = null, PREF = null, PREF_BY_VID = null, MODEL = null, RECS = null, APPROVED = [], WH = null, TAB = 'overview';
+let PO_FILE = '', PREF_FILE = '';
+const STATUS_OFF = new Set();
+
+/* ===================== PARSING ===================== */
+const PO_COLS = { date: 'capacity handler date', slot: 'slot name', dock: 'loading_dock_name', po: 'po_number', status: 'status',
+  qty: 'incoming_qty', vid: 'vendor id', vendor: 'vendor', wh: 'destination_name', cap: 'max_timeslot_po_qty' };
+const PO_OPT = { start: 'start_at', end: 'end_at', dest: 'destination_id' };
+const PREF_COLS = { vid: 'vendor id', days: 'inbound days', hours: 'new_inbound_hours' };
+const PREF_OPT = { dest: 'destination_id' };
+
+function keyMapOf(objs) { const m = {}; Object.keys(objs[0] || {}).forEach(k => { m[String(k).trim().toLowerCase()] = k; }); return m; }
+function kindOf(objs) {
+  if (!objs.length) return null;
+  const km = keyMapOf(objs);
+  if ('po_number' in km && 'max_timeslot_po_qty' in km) return 'po';
+  if ('inbound days' in km || 'new_inbound_hours' in km) return 'pref';
+  return null;
+}
+function parsePo(objs) {
+  const km = keyMapOf(objs);
+  const miss = Object.values(PO_COLS).filter(h => !(h in km));
+  if (miss.length) throw new Error('PO data is missing column(s): ' + miss.join(', '));
+  const g = (o, f) => o[km[PO_COLS[f] || PO_OPT[f]]];
+  return objs.map(o => ({
+    date: toIsoDate(g(o, 'date')), slot: toSlot(g(o, 'slot')), dock: clean(g(o, 'dock')), po: clean(g(o, 'po')),
+    status: clean(g(o, 'status')), qty: toNum(g(o, 'qty')), vid: normId(g(o, 'vid')), vendor: clean(g(o, 'vendor')),
+    wh: clean(g(o, 'wh')), cap: toNum(g(o, 'cap')), dest: normId(g(o, 'dest')), start: toMin(g(o, 'start')), end: toMin(g(o, 'end'))
+  })).filter(r => r.po || r.date);
+}
+function parsePref(objs) {
+  const km = keyMapOf(objs);
+  const miss = Object.values(PREF_COLS).filter(h => !(h in km));
+  if (miss.length) throw new Error('Vendor preference data is missing column(s): ' + miss.join(', '));
+  const g = (o, f) => o[km[PREF_COLS[f] || PREF_OPT[f]]];
+  const map = new Map(), byVid = new Map();
+  const add = (m, k, rule) => {
+    const list = m.get(k) || [];
+    const sig = [...rule.days].sort().join(',') + '|' + rule.wins.map(w => w.s + '-' + w.e).join(',');
+    if (!list.some(x => x.sig === sig)) list.push(Object.assign({ sig }, rule));
+    m.set(k, list);
+  };
+  objs.forEach(o => {
+    const vid = normId(g(o, 'vid')); if (!vid) return;
+    const days = new Set(String(clean(g(o, 'days'))).split(/[,;/]+/).map(t => DAY_IDX[t.trim().toLowerCase().slice(0, 3)] ?? DAY_IDX[t.trim().toLowerCase()]).filter(x => x != null));
+    const wins = parseHours(clean(g(o, 'hours')));
+    if (!days.size && !wins.length) return;
+    const rule = { days, wins };
+    add(map, vid + '|' + normId(g(o, 'dest')), rule);
+    add(byVid, vid, rule);
+  });
+  return { map, byVid };
+}
+function parseHours(t) {
+  const out = []; const re = /(\d{1,2})[:.](\d{2})(?:[:.]\d{2})?\s*(?:to|-|–|s\/d|sd)\s*(\d{1,2})[:.](\d{2})/gi; let m;
+  while ((m = re.exec(t))) out.push({ s: +m[1] * 60 + +m[2], e: +m[3] * 60 + +m[4] });
+  return out;
+}
+function clean(v) { if (v === null || v === undefined) return ''; const t = String(v).trim(); return t.toLowerCase() === 'null' ? '' : t; }
+function toNum(v) { if (typeof v === 'number') return v; const n = Number(clean(v).replace(/,/g, '')); return isNaN(n) ? 0 : n; }
+function normId(v) { const t = clean(v); return /^\d+(\.0+)?$/.test(t) ? String(parseInt(t, 10)) : t; }
+function toSlot(v) { const m = clean(v).match(/\d+/); return m ? Number(m[0]) : 0; }
+function pad(n) { return String(n).padStart(2, '0'); }
+function toMin(v) {
+  if (v instanceof Date) return v.getHours() * 60 + v.getMinutes();
+  if (typeof v === 'number' && v >= 0 && v < 1) return Math.round(v * 1440);
+  const m = clean(v).match(/^(\d{1,2}):(\d{2})/); return m ? +m[1] * 60 + +m[2] : null;
+}
+function toIsoDate(v) {
+  if (v instanceof Date && !isNaN(v)) return v.getFullYear() + '-' + pad(v.getMonth() + 1) + '-' + pad(v.getDate());
+  if (typeof v === 'number' && v > 20000 && v < 80000) { const d = new Date(Date.UTC(1899, 11, 30) + v * 86400000); return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
+  const t = clean(v); if (!t) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+  const d = new Date(t.replace(/\bSept\b/i, 'Sep'));
+  return isNaN(d) ? t : d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+
+/* ===================== FILE LOADING ===================== */
+function readFile(file) {
+  return new Promise((res, rej) => {
+    if (/\.xlsx?$/i.test(file.name)) {
+      const fr = new FileReader();
+      fr.onload = e => {
+        try {
+          const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+          res(wb.SheetNames.map(n => ({ name: file.name + ' · ' + n, objs: XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '', raw: true }) })));
+        } catch (err) { rej(new Error('Could not read ' + file.name + ': ' + err.message)); }
+      };
+      fr.onerror = () => rej(new Error('Could not read ' + file.name));
+      fr.readAsArrayBuffer(file);
+    } else {
+      Papa.parse(file, { header: true, skipEmptyLines: true, complete: r => res([{ name: file.name, objs: r.data }]), error: e => rej(e) });
+    }
+  });
+}
+async function loadFiles(files) {
+  if (!files || !files.length) return;
+  document.getElementById('err').textContent = '';
+  try {
+    const tables = (await Promise.all([...files].map(readFile))).flat();
+    applyTables(tables);
+    SHARED = false; renderSources();
+    toast('Loaded on your screen only. To share it, replace data/capacity.xlsx in the repo.');
+  } catch (e) { document.getElementById('err').textContent = e.message; toast(e.message); }
+}
+function tablesFromBuffer(buf, name) {
+  const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+  return wb.SheetNames.map(n => ({ name: name + ' · ' + n, objs: XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '', raw: true }) }));
+}
+function applyTables(tables) {
+  {
+    let gotPo = false, gotPref = false;
+    tables.forEach(t => {
+      const k = kindOf(t.objs);
+      if (k === 'po' && !gotPo) { RAW = parsePo(t.objs); PO_FILE = t.name; gotPo = true; }
+      else if (k === 'pref' && !gotPref) { const p = parsePref(t.objs); PREF = p.map; PREF_BY_VID = p.byVid; PREF_FILE = t.name; gotPref = true; }
+    });
+    if (!gotPo && !gotPref) throw new Error('No PO schedule or vendor preference table found. Check that the header row is included.');
+    if (gotPo) STATUS_OFF.clear();
+    renderSources();
+    if (RAW) rebuild(gotPo);
+  }
+}
+
+/* ===================== SHARED DATA FROM THE REPO + SHARE LINK ===================== */
+const REPO_DATA = 'data/capacity.xlsx';
+let SHARED = false, SHARED_DATE = '', RESTORING = true;
+const START_HASH = location.hash;   // read before the first render rewrites it
+async function loadShared() {
+  if (!/^https?:/.test(location.protocol)) return false;
+  try {
+    const r = await fetch(REPO_DATA, { cache: 'no-cache' });
+    if (!r.ok) return false;
+    const lm = r.headers.get('last-modified');
+    applyTables(tablesFromBuffer(await r.arrayBuffer(), 'capacity.xlsx'));
+    SHARED = true; SHARED_DATE = lm ? new Date(lm).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    renderSources();
+    return true;
+  } catch (e) { return false; }
+}
+const b64e = t => btoa(unescape(encodeURIComponent(t))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const b64d = t => decodeURIComponent(escape(atob(t.replace(/-/g, '+').replace(/_/g, '/'))));
+function saveState() {
+  if (RESTORING || !MODEL) return;
+  const st = { w: WH, t: TAB, o: [...STATUS_OFF], m: APPROVED.map(a => [a.date, a.wh, a.fromSlot, a.vk, a.toDate, a.toSlot]) };
+  history.replaceState(null, '', '#s=' + b64e(JSON.stringify(st)));
+}
+function restoreState() {
+  RESTORING = false;
+  const m = START_HASH.match(/s=([\w-]+)/); if (!m || !MODEL) { saveState(); return; }
+  let st; try { st = JSON.parse(b64d(m[1])); } catch (e) { return; }
+  RESTORING = true;
+  (st.o || []).forEach(x => STATUS_OFF.add(x));
+  if (STATUS_OFF.size) rebuild(false);
+  if (st.w && MODEL.whs.includes(st.w)) WH = st.w;
+  if (st.t) TAB = st.t;
+  let missing = 0;
+  (st.m || []).forEach(([d, w, n, vk, td, ts]) => {
+    const s = MODEL.slots.get(key(d, w, n)), v = s && s.vendors.get(vk);
+    if (!v) { missing++; return; }
+    approve({ date: d, wh: w, fromSlot: n, vk, vid: v.vid, dest: v.dest, vendor: v.vendor, qty: v.qty, pos: v.pos }, td, ts);
+  });
+  RESTORING = false;
+  renderControls(); render();
+  if (missing) toast(missing + ' saved move(s) no longer match the current data and were skipped');
+}
+function copyShareLink() {
+  saveState();
+  const done = () => toast(SHARED ? 'Link copied. Anyone with it sees the same data and approved moves.' : 'Link copied. Note: others only see the data that is in the repo.');
+  if (navigator.clipboard) navigator.clipboard.writeText(location.href).then(done, () => prompt('Copy this link', location.href));
+  else prompt('Copy this link', location.href);
+}
+function renderSources() {
+  const po = '<span class="src ' + (RAW ? 'on' : '') + '"><span class="dot"></span>' + (RAW ? (SHARED ? 'Shared data from repo' + (SHARED_DATE ? ', updated ' + esc(SHARED_DATE) : '') : 'Your upload (only on your screen)') + ': ' + fmt(RAW.length) + ' PO rows' : 'PO schedule: not loaded') + '</span>';
+  const pf = '<span class="src ' + (PREF ? 'on' : 'off') + '"' + (PREF ? '' : ' data-act="upload" style="cursor:pointer"') + '><span class="dot"></span>' +
+    (PREF ? 'Vendor preference: ' + esc(PREF_FILE) + ' (' + fmt(PREF.size) + ' vendor–warehouse pairs)' : 'Vendor preference: not loaded') + '</span>';
+  document.getElementById('srcs').innerHTML = po + pf;
+  document.getElementById('needPo').classList.toggle('on', !!RAW);
+  document.getElementById('needPref').classList.toggle('on', !!PREF);
+}
+
+/* ===================== MODEL ===================== */
+const key = (d, w, n) => d + '|' + w + '|' + n;
+function buildModel(rows) {
+  const slots = new Map(), capFb = new Map(), whs = new Set(), dset = {}, nums = {}, win = {};
+  rows.forEach(r => {
+    if (!r.date || !r.wh || !r.slot) return;
+    const k = key(r.date, r.wh, r.slot);
+    let s = slots.get(k);
+    if (!s) { s = { key: k, date: r.date, wh: r.wh, slot: r.slot, cap: 0, load: 0, pos: [], vendors: new Map() }; slots.set(k, s); }
+    s.cap = Math.max(s.cap, r.cap || 0);                 // capacity = MAX per slot, never SUM
+    s.load += r.qty || 0;
+    s.pos.push(r);
+    const vk = r.vid || r.vendor;
+    let v = s.vendors.get(vk);
+    if (!v) { v = { vk, vid: r.vid, vendor: r.vendor, dest: r.dest, qty: 0, pos: [] }; s.vendors.set(vk, v); }
+    v.qty += r.qty || 0; v.pos.push(r.po);
+    const ck = r.wh + '|' + r.slot;
+    capFb.set(ck, Math.max(capFb.get(ck) || 0, r.cap || 0));
+    whs.add(r.wh);
+    (dset[r.wh] = dset[r.wh] || new Set()).add(r.date);
+    (nums[r.wh] = nums[r.wh] || new Set([1, 2, 3])).add(r.slot);
+    if (r.start != null && !win[ck]) win[ck] = { s: r.start, e: r.end != null ? r.end : r.start };
+  });
+  const dates = {};
+  Object.keys(dset).forEach(w => {
+    const sorted = [...dset[w]].sort(), out = [];
+    for (let d = sorted[0]; d <= sorted[sorted.length - 1]; d = addDays(d, 1)) out.push(d);   // fill gaps (e.g. Sunday)
+    dates[w] = out; nums[w] = [...nums[w]].sort((a, b) => a - b);
+  });
+  return { slots, capFb, whs: [...whs].sort(), dates, nums, win };
+}
+const capOf = (d, w, n) => { const s = MODEL.slots.get(key(d, w, n)); return s && s.cap ? s.cap : (MODEL.capFb.get(w + '|' + n) || 0); };
+const ld = (loads, d, w, n) => loads.get(key(d, w, n)) || 0;
+const baseLoads = () => { const m = new Map(); MODEL.slots.forEach(s => m.set(s.key, s.load)); return m; };
+const limitOf = (sc, n) => RULES[sc][n] != null ? RULES[sc][n] : 1;
+
+function evalDay(loads, d, w) {
+  const nums = MODEL.nums[w] || [1, 2, 3];
+  const util = n => { const c = capOf(d, w, n), l = ld(loads, d, w, n); return c ? l / c : (l > 0 ? Infinity : 0); };
+  const u1 = util(1), u2 = util(2);
+  let scen, reason, short;
+  if (u1 > 1 + EPS && u2 > 1 + EPS) {
+    const ex = sc => nums.reduce((t, n) => t + Math.max(0, ld(loads, d, w, n) - capOf(d, w, n) * limitOf(sc, n)), 0);
+    const exA = ex('A'), exB = ex('B');
+    scen = exB < exA ? 'B' : 'A';
+    reason = 'Slot 1 and Slot 2 are both over. Keeping Slot 1 over means moving ' + fmt(exA) + ' qty; keeping Slot 2 over means moving ' + fmt(exB) +
+             ' qty. The smaller option is used: ' + RULE_TEXT[scen].charAt(0).toLowerCase() + RULE_TEXT[scen].slice(1);
+    short = 'Both over · keep Slot ' + (scen === 'A' ? '1' : '2') + ' · ' + RULE_SHORT[scen].split('→ ')[1];
+  } else if (u1 > 1 + EPS) scen = 'A'; else if (u2 > 1 + EPS) scen = 'B'; else scen = 'N';
+  reason = reason || RULE_TEXT[scen]; short = short || RULE_SHORT[scen];
+  const slots = {};
+  nums.forEach(n => {
+    const cap = capOf(d, w, n), load = ld(loads, d, w, n), u = util(n), limit = limitOf(scen, n);
+    slots[n] = { n, cap, load, util: u, limit, status: u <= 1 + EPS ? 'ok' : (u <= limit + EPS ? 'over' : 'bad'), excess: Math.max(0, load - cap * limit) };
+  });
+  return { scen, reason, short, slots, nums };
+}
+
+/* ===================== VENDOR PREFERENCE ===================== */
+function prefRules(vid, dest) {
+  if (!PREF) return null;
+  return PREF.get(vid + '|' + dest) || (dest ? null : PREF_BY_VID.get(vid)) || null;
+}
+function overlaps(h, s) {                       // h = vendor window, s = slot window, minutes
+  if (h.e === h.s) return h.s >= s.s && h.s < s.e;
+  if (h.e < h.s) return overlaps({ s: h.s, e: 1440 }, s) || overlaps({ s: 0, e: h.e }, s);
+  return h.s < s.e && h.e > s.s;
+}
+function prefFit(vid, dest, wh, date, slot) {
+  if (!PREF) return { fit: 'nodata', why: 'Vendor preference not uploaded' };
+  const rules = prefRules(vid, dest);
+  if (!rules) return { fit: 'unknown', why: 'No delivery preference for this vendor at this warehouse' };
+  const wd = weekday(date), win = MODEL.win[wh + '|' + slot];
+  let dayOk = false, hourOk = false;
+  for (const r of rules) {
+    const d = !r.days.size || r.days.has(wd), h = !r.wins.length || !win || r.wins.some(x => overlaps(x, win));
+    if (d && h) return { fit: 'yes', why: '' };
+    dayOk = dayOk || d; hourOk = hourOk || h;
+  }
+  return { fit: 'no', why: !dayOk ? DAY_NAME[wd] + ' is not a delivery day' : (!hourOk ? 'Outside delivery hours' : 'Day and hours do not match') };
+}
+function prefText(vid, dest) {
+  if (!PREF) return '';
+  const rules = prefRules(vid, dest);
+  if (!rules) return '';
+  return rules.map(r => {
+    const days = r.days.size ? dayRange([...r.days]) : 'Any day';
+    const hrs = r.wins.length ? r.wins.map(w => hhmm(w.s) + '–' + hhmm(w.e)).join(', ') : 'any time';
+    return days + ' · ' + hrs;
+  }).join(' | ');
+}
+function dayRange(idx) {
+  const order = [1, 2, 3, 4, 5, 6, 0].filter(i => idx.includes(i));
+  const pos = order.map(i => (i + 6) % 7), out = [];
+  for (let i = 0; i < pos.length; i++) {
+    let j = i; while (j + 1 < pos.length && pos[j + 1] === pos[j] + 1) j++;
+    out.push(j - i >= 2 ? DAY_NAME[order[i]] + '–' + DAY_NAME[order[j]] : order.slice(i, j + 1).map(x => DAY_NAME[x]).join(', '));
+    i = j;
+  }
+  return out.join(', ');
+}
+
+/* ===================== MOVES ===================== */
+function moveOk(loads, w, d, from, td, ts, qty) {
+  const before = evalDay(loads, td, w);
+  const kF = key(d, w, from), kT = key(td, w, ts);
+  loads.set(kF, ld(loads, d, w, from) - qty); loads.set(kT, ld(loads, td, w, ts) + qty);
+  const after = evalDay(loads, td, w);
+  loads.set(kF, ld(loads, d, w, from) + qty); loads.set(kT, ld(loads, td, w, ts) - qty);
+  const t = after.slots[ts];
+  if (!t || t.status === 'bad') return null;
+  for (const n of after.nums) {
+    if (after.slots[n].status === 'bad' && before.slots[n].status !== 'bad') return null;   // no slot that day may newly break the rule
+  }
+  return t.util;
+}
+function candidates(loads, w, d, from, v) {
+  const out = [], dates = MODEL.dates[w], i0 = dates.indexOf(d);
+  for (let i = i0; i < dates.length; i++) {
+    const td = dates[i];
+    MODEL.nums[w].forEach(ts => {
+      if (td === d && ts === from) return;
+      if (!capOf(td, w, ts)) return;
+      out.push({ date: td, slot: ts, offset: i - i0, fit: prefFit(v.vid, v.dest, w, td, ts) });
+    });
+  }
+  return out;
+}
+function bestTarget(loads, w, d, from, v) {
+  const opts = candidates(loads, w, d, from, v).filter(c => c.fit.fit === 'yes')
+    .map(c => Object.assign(c, { after: moveOk(loads, w, d, from, c.date, c.slot, v.qty) })).filter(c => c.after != null);
+  opts.sort((a, b) => a.offset - b.offset || (a.after > 1 + EPS) - (b.after > 1 + EPS) || a.after - b.after);
+  return opts[0] || null;
+}
+
+function recommend() {
+  const loads = baseLoads(), moves = [], problems = [];
+  let seq = 0;
+  MODEL.whs.forEach(w => MODEL.dates[w].forEach(d => {
+    const ev = evalDay(loads, d, w);
+    ev.nums.filter(n => ev.slots[n].excess > EPS).sort((a, b) => ev.slots[b].excess - ev.slots[a].excess).forEach(n => {
+      const b = ev.slots[n], src = MODEL.slots.get(key(d, w, n));
+      const prob = { id: 'p' + problems.length, date: d, wh: w, slot: n, util: b.util, limit: b.limit, cap: b.cap, load: b.load,
+                     excess: b.excess, reason: ev.reason, unresolved: 0 };
+      let excess = ld(loads, d, w, n) - capOf(d, w, n) * b.limit;
+      const cands = src ? [...src.vendors.values()].filter(v => v.qty > 0) : [];
+      while (excess > EPS && cands.length) {
+        const tgt = new Map(cands.map(v => [v, bestTarget(loads, w, d, n, v)]));
+        const pool = cands.filter(v => tgt.get(v));
+        if (!pool.length) break;
+        const pick = pool.filter(v => v.qty >= excess - EPS).sort((a, c) => a.qty - c.qty)[0] || pool.slice().sort((a, c) => c.qty - a.qty)[0];
+        const t = tgt.get(pick);
+        cands.splice(cands.indexOf(pick), 1);
+        loads.set(key(d, w, n), ld(loads, d, w, n) - pick.qty);
+        loads.set(key(t.date, w, t.slot), ld(loads, t.date, w, t.slot) + pick.qty);
+        moves.push({ id: 'm' + (seq++), date: d, wh: w, fromSlot: n, vk: pick.vk, vid: pick.vid, dest: pick.dest, vendor: pick.vendor,
+                     qty: pick.qty, pos: pick.pos.slice(), toDate: t.date, toSlot: t.slot, fit: t.fit.fit, problemId: prob.id });
+        excess -= pick.qty;
+      }
+      if (excess > EPS) prob.unresolved = excess;
+      problems.push(prob);
+    });
+  }));
+  return { moves, problems };
+}
+
+/* ===================== SIMULATION ===================== */
+const approvedFor = (d, w, n, vk) => APPROVED.find(a => a.date === d && a.wh === w && a.fromSlot === n && a.vk === vk);
+function simLoads(skip) {
+  const loads = baseLoads();
+  APPROVED.forEach(a => {
+    if (a === skip || !a.toDate || !a.toSlot) return;
+    loads.set(key(a.date, a.wh, a.fromSlot), ld(loads, a.date, a.wh, a.fromSlot) - a.qty);
+    loads.set(key(a.toDate, a.wh, a.toSlot), ld(loads, a.toDate, a.wh, a.toSlot) + a.qty);
+  });
+  return loads;
+}
+function poCounts(withMoves) {
+  const m = new Map(); MODEL.slots.forEach(s => m.set(s.key, s.pos.length));
+  if (withMoves) APPROVED.forEach(a => {
+    if (!a.toDate || !a.toSlot) return;
+    const f = key(a.date, a.wh, a.fromSlot), t = key(a.toDate, a.wh, a.toSlot);
+    m.set(f, (m.get(f) || 0) - a.pos.length); m.set(t, (m.get(t) || 0) + a.pos.length);
+  });
+  return m;
+}
+function approve(v, toDate, toSlot) {
+  if (approvedFor(v.date, v.wh, v.fromSlot, v.vk)) return;
+  APPROVED.push({ id: 'a' + Date.now() + Math.random().toString(36).slice(2, 6), date: v.date, wh: v.wh, fromSlot: v.fromSlot, vk: v.vk, vid: v.vid,
+    dest: v.dest, vendor: v.vendor, qty: v.qty, pos: v.pos, toDate, toSlot: Number(toSlot) || '' });
+}
+function unapprove(d, w, n, vk) { APPROVED = APPROVED.filter(a => !(a.date === d && a.wh === w && a.fromSlot === n && a.vk === vk)); }
+
+function targetOptions(v, selected) {
+  if (!PREF) return { html: '<option value="">Upload the vendor preference file first</option>', count: 0 };
+  if (!prefRules(v.vid, v.dest)) return { html: '<option value="">No delivery days & hours on file for this vendor</option>', count: 0 };
+  const self = approvedFor(v.date, v.wh, v.fromSlot, v.vk);
+  const loads = simLoads(self);
+  let html = '', count = 0, hasSel = false;
+  candidates(loads, v.wh, v.date, v.fromSlot, v).forEach(c => {
+    if (c.fit.fit !== 'yes') return;
+    if (moveOk(loads, v.wh, v.date, v.fromSlot, c.date, c.slot, v.qty) == null) return;
+    const cap = capOf(c.date, v.wh, c.slot), now = ld(loads, c.date, v.wh, c.slot) / cap, after = (ld(loads, c.date, v.wh, c.slot) + v.qty) / cap;
+    const val = c.date + '|' + c.slot; if (val === selected) hasSel = true;
+    html += '<option value="' + val + '"' + (val === selected ? ' selected' : '') + '>' +
+      esc((c.offset === 0 ? 'Same day' : niceDate(c.date, true)) + ', Slot ' + c.slot + slotTime(v.wh, c.slot, ' (', ')') + ': ' +
+          Math.round(now * 100) + '% → ' + Math.round(after * 100) + '%' + (after > 1 + EPS ? ' (over 100%, allowed)' : '')) + '</option>';
+    count++;
+  });
+  if (selected && !hasSel) {
+    const [sd, ss] = selected.split('|');
+    html = '<option value="' + selected + '" selected>' + esc((sd === v.date ? 'Same day' : niceDate(sd, true)) + ', Slot ' + ss + ': no longer has room') + '</option>' + html;
+  }
+  if (!count && !selected) return { html: '<option value="">No slot fits this vendor\'s days & hours with room left</option>', count: 0 };
+  return { html: '<option value="">Choose where to move</option>' + html, count: count + (selected && !hasSel ? 1 : 0) };
+}
+const selAttr = o => o.count ? '' : ' disabled';
+
+/* ===================== RENDER ===================== */
+function rebuild(resetWh) {
+  const rows = RAW.filter(r => !STATUS_OFF.has(r.status || '(blank)'));
+  MODEL = buildModel(rows);
+  RECS = recommend();
+  APPROVED = [];
+  if (resetWh || !MODEL.whs.includes(WH)) WH = MODEL.whs[0] || null;
+  document.getElementById('empty').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  renderSources(); renderControls(); render();
+}
+function renderControls() {
+  const sel = document.getElementById('whSel');
+  sel.innerHTML = MODEL.whs.map(w => {
+    const bad = RECS.problems.filter(p => p.wh === w).length;
+    return '<option value="' + esc(w) + '"' + (w === WH ? ' selected' : '') + '>' + esc(w) + (bad ? '  (' + bad + ' too full)' : '') + '</option>';
+  }).join('');
+  const statuses = [...new Set(RAW.map(r => r.status || '(blank)'))].sort();
+  document.getElementById('statusChips').innerHTML = statuses.map(s =>
+    '<span class="chip ' + (STATUS_OFF.has(s) ? '' : 'on') + '" data-act="status" data-s="' + esc(s) + '">' + esc(prettyStatus(s)) + '</span>').join('');
+}
+function render() {
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === TAB));
+  const probs = RECS.problems.filter(p => p.wh === WH).length;
+  const cr = document.getElementById('cntRecs'); cr.textContent = probs; cr.className = 'count' + (probs ? ' bad' : '');
+  const sims = APPROVED.filter(a => a.wh === WH).length;
+  const cs = document.getElementById('cntSim'); cs.textContent = sims; cs.className = 'count' + (sims ? ' acc' : '');
+  const v = document.getElementById('view');
+  if (!WH) { v.innerHTML = '<div class="okbox">No data.</div>'; return; }
+  v.innerHTML = TAB === 'overview' ? viewOverview() : TAB === 'recs' ? viewRecs() : viewSim();
+  saveState();
+}
+const kpi = (k, v, s, color) => '<div class="kpi"><div class="k">' + k + '</div><div class="v"' + (color ? ' style="color:' + color + '"' : '') + '>' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>';
+
+function prefBanner() {
+  return PREF ? '' : '<div class="note warn"><b>Upload the vendor preference file to move vendors.</b> A vendor can only be moved to a day and slot that matches its inbound days and delivery hours. ' +
+    '<button class="btn small outline" data-act="upload">Upload Sheet2</button></div>';
+}
+function rulesBox() {
+  return '<details class="note"><summary>How to read this page</summary><ul>' +
+    '<li><b>Capacity</b> of a slot = max_timeslot_po_qty for that date, slot and warehouse (taken once, not added up). <b>Used %</b> = total incoming qty ÷ capacity.</li>' +
+    '<li>Normal maximum: Slot 1 up to 125%, Slot 2 up to 133%, Slot 3 up to 125%.</li>' +
+    '<li>If Slot 1 is over 100%, Slot 2 must stay at or below 100% (Slot 3 can still go to 125%). If Slot 2 is over 100%, Slot 1 and Slot 3 must stay at or below 100%.</li>' +
+    '<li>To fix a slot, a whole vendor is moved (all its POs in that slot), never a single PO.</li>' +
+    '<li>A vendor is only suggested for a day and slot that matches its <b>inbound days</b> and <b>delivery hours</b> (from the vendor preference file). The same day is tried first, then later days in the uploaded week.</li>' +
+    '<li>On each bar, the grey mark is 100% and the red mark is the highest % allowed that day.</li></ul></details>';
+}
+function legend(sim) {
+  return '<div class="legend"><span><i style="background:#fff"></i>OK (≤100%)</span><span><i style="background:var(--amber-soft);border-color:var(--amber-line)"></i>Over, still allowed</span>' +
+    '<span><i style="background:var(--red-soft);border-color:var(--red-line)"></i>Slot too full</span>' +
+    '<span><i style="background:#fff;border:2px solid var(--red)"></i>Day that breaks the rule</span>' +
+    (sim ? '<span><i style="box-shadow:inset 0 0 0 2px var(--primary)"></i>Changed by a move</span>' : '<span>Click any slot to see its vendors and POs</span>') + '</div>';
+}
+
+function calendar(loads, before, dates, counts) {
+  counts = counts || poCounts(false);
+  const nums = MODEL.nums[WH];
+  const evs = dates.map(d => evalDay(loads, d, WH)), evB = before ? dates.map(d => evalDay(before, d, WH)) : null;
+  const months = [...new Set(dates.map(d => monthName(d)))].join(' – ');
+  const isBad = ev => ev.nums.some(n => ev.slots[n].status === 'bad');
+  const col = dates.map((d, i) => isBad(evs[i]) ? 'bad' : (evB && isBad(evB[i]) ? 'fix' : ''));
+  let h = '<div class="calwrap"><table class="cal"><thead><tr><th class="corner" rowspan="2">Slot / Timeslot</th><th class="month" colspan="' + dates.length + '">' + months + '</th></tr><tr>' +
+    dates.map((d, i) => { const p = d.split('-'); return '<th class="' + (col[i] ? 'd' + col[i] : '') + '"><div class="dayh"><span>' + DAY_NAME[weekday(d)] + '</span><span>' + p[2] + '</span></div>' +
+      (col[i] === 'bad' ? '<div class="brk">Breaks the rule</div>' : col[i] === 'fix' ? '<div class="fix">Fixed by moves</div>' : '') + '</th>'; }).join('') + '</tr></thead><tbody>';
+  h += '<tr><td class="rowh"><div class="bar" style="background:var(--navy)"></div><b>Day total</b><span>All slots</span></td>' + evs.map((ev, i) => {
+    const cap = ev.nums.reduce((t, n) => t + ev.slots[n].cap, 0), load = ev.nums.reduce((t, n) => t + ev.slots[n].load, 0);
+    const st = ev.nums.some(n => ev.slots[n].status === 'bad') ? 'bad' : ev.nums.some(n => ev.slots[n].status === 'over') ? 'over' : 'ok';
+    const lbl = st === 'bad' ? 'Too full!' : st === 'over' ? 'Over capacity' : 'Max. capacity';
+    return '<td class="' + (col[i] === 'bad' ? 'colbad' : '') + '"><div class="tot ' + st + '"><div class="l"><span>' + lbl + '</span><span class="info" title="' + esc(ev.reason) + '">i</span></div>' +
+      '<div class="nums"><span style="color:' + (load > cap ? 'var(--red)' : 'inherit') + '">' + fmt(load) + '</span><span>/</span><span>' + fmt(cap) + '</span></div>' +
+      '<div class="rr">' + esc(ev.short) + '</div></div></td>';
+  }).join('') + '</tr>';
+  nums.forEach(n => {
+    h += '<tr><td class="rowh"><div class="bar"></div><b>Slot ' + n + '</b><span>' + (slotTime(WH, n, '', '') || '—') + '</span></td>';
+    dates.forEach((d, i) => { h += cell(d, evs[i].slots[n], evB ? evB[i].slots[n] : null, counts.get(key(d, WH, n)) || 0, col[i] === 'bad' ? ' colbad' : ''); });
+    h += '</tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+function cell(d, s, b, nPo, colCls) {
+  const w = x => Math.min(x / METER_MAX, 1) * 100;
+  const changed = b && Math.abs(b.load - s.load) > EPS;
+  const color = { ok: 'var(--green)', over: 'var(--amber)', bad: 'var(--red)' }[s.status];
+  return '<td class="cell ' + s.status + (colCls || '') + (changed ? ' changed' : '') + '" data-act="slot" data-d="' + d + '" data-n="' + s.n + '">' +
+    '<div class="cap">Capacity:</div><div class="nums"><span class="' + (s.load > s.cap ? 'hi' : '') + '">' + fmt(s.load) + '</span><span>/</span><span>' + fmt(s.cap) + '</span></div>' +
+    '<div class="po"><span>Total PO</span><span>' + nPo + '</span></div>' +
+    '<div class="meter">' + (changed ? '<div class="ghost" style="width:' + w(b.util) + '%"></div>' : '') + '<div class="fill" style="width:' + w(s.util) + '%;background:' + color + '"></div>' +
+    '<div class="mk" style="left:' + w(1) + '%"></div>' + (s.limit > 1 + EPS ? '<div class="mk lim" style="left:' + w(s.limit) + '%"></div>' : '') + '</div>' +
+    '<div class="foot"><span>' + (changed ? '<span class="was">' + pct(b.util) + ' → </span>' : '') + '<span class="pct">' + pct(s.util) + '</span></span><span class="tag ' + s.status + '">' + STATUS_LABEL[s.status] + '</span></div></td>';
+}
+
+function viewOverview() {
+  const loads = baseLoads(), dates = MODEL.dates[WH];
+  let bad = 0, over = 0, total = 0;
+  dates.forEach(d => { const ev = evalDay(loads, d, WH); ev.nums.forEach(n => { if (!ev.slots[n].cap) return; total++; if (ev.slots[n].status === 'bad') bad++; if (ev.slots[n].status === 'over') over++; }); });
+  const moves = RECS.moves.filter(m => m.wh === WH);
+  return '<div class="strip">' +
+    kpi('Slots checked', fmt(total), niceDate(dates[0], true) + ' – ' + niceDate(dates[dates.length - 1], true)) +
+    kpi('Too full', fmt(bad), 'above the allowed maximum', bad ? 'var(--red)' : 'var(--green)') +
+    kpi('Over, still allowed', fmt(over), 'above 100% but within the rules', over ? 'var(--amber)' : null) +
+    kpi('Suggested to move', fmt(moves.reduce((t, m) => t + m.qty, 0)) + ' qty', moves.length + ' vendor' + (moves.length === 1 ? '' : 's') + (moves.length ? ' · see Recommendations' : '')) +
+    '</div>' + prefBanner() + rulesBox() + legend(false) + calendar(loads, null, dates);
+}
+
+function viewRecs() {
+  const probs = RECS.problems.filter(p => p.wh === WH);
+  if (!probs.length) return '<div class="okbox"><b>All slots are within the rules</b>Nothing needs to move at ' + esc(WH) + ' for the statuses you counted.</div>';
+  const recMoves = RECS.moves.filter(m => m.wh === WH);
+  const allDone = recMoves.length && recMoves.every(m => approvedFor(m.date, m.wh, m.fromSlot, m.vk));
+  return prefBanner() + '<div class="toolbar"><span class="txt">' + probs.length + ' slot' + (probs.length > 1 ? 's are' : ' is') + ' too full. Each suggestion only uses a day and slot the vendor can deliver to. ' +
+    'You can pick another day or slot from the list, then approve it to see it in Simulation.</span>' +
+    (allDone || !recMoves.length ? '' : '<button class="btn primary" data-act="approveAll">Approve all suggestions</button>') +
+    '<button class="btn" data-act="exportRecs">Export suggestions (CSV)</button></div>' +
+    probs.map(p => {
+      const ms = RECS.moves.filter(m => m.problemId === p.id);
+      return '<div class="prob"><h3>' + niceDate(p.date, true) + ' · Slot ' + p.slot + slotTime(WH, p.slot, ' (', ')') + ' is too full</h3>' +
+        '<div class="why">' + pct(p.util) + ' used (' + fmt(p.load) + ' of ' + fmt(p.cap) + ' qty), but the maximum allowed that day is ' + Math.round(p.limit * 100) + '%. ' + esc(p.reason) + '</div>' +
+        '<div class="needq">Need to move at least ' + fmt(p.excess) + ' qty out of this slot.</div>' +
+        ms.map(recRow).join('') +
+        (p.unresolved ? '<div class="vrow"><div class="warnnote">' + (ms.length ? 'Even after these vendors, ' + fmt(p.unresolved) + ' qty is still over. ' : '') +
+          'No other vendor in this slot has a day and slot that fits its delivery preference and still has room in the uploaded dates. Open the slot to move one by hand, or call the vendor.</div></div>' : '') +
+        '<button class="btn link" data-act="slot" data-d="' + p.date + '" data-n="' + p.slot + '">See all vendors in this slot</button></div>';
+    }).join('');
+}
+function recRow(m) {
+  const a = approvedFor(m.date, m.wh, m.fromSlot, m.vk);
+  const sel = a ? (a.toDate ? a.toDate + '|' + a.toSlot : '') : m.toDate + '|' + m.toSlot;
+  const pt = prefText(m.vid, m.dest), to = targetOptions(m, sel);
+  return '<div class="vrow' + (a ? ' done' : '') + '">' +
+    '<div><div class="vn">' + esc(m.vendor) + '</div>' + prefLine(pt) + '<div class="vp">Vendor ID ' + esc(m.vid) + ' · ' + m.pos.length + ' PO' + (m.pos.length > 1 ? 's' : '') + ': ' + esc(m.pos.join(', ')) + '</div></div>' +
+    '<div><b>' + fmt(m.qty) + '</b> qty</div>' +
+    '<div><select data-act="recTarget" data-id="' + m.id + '"' + selAttr(to) + '>' + to.html + '</select></div>' +
+    '<div>' + (a ? '<button class="btn small ok" data-act="unapproveRec" data-id="' + m.id + '">Approved ✓</button>' : '<button class="btn small primary" data-act="approveRec" data-id="' + m.id + '"' + selAttr(to) + '>Approve</button>') + '</div>' +
+    '</div>';
+}
+function prefLine(pt) {
+  if (!PREF) return '';
+  return pt ? '<div class="pref">Delivers: ' + esc(pt) + '</div>' : '<div class="pref none">No delivery preference on file</div>';
+}
+
+function viewSim() {
+  const mine = APPROVED.filter(a => a.wh === WH);
+  const before = baseLoads(), after = simLoads(), dates = MODEL.dates[WH];
+  const countBad = loads => dates.reduce((t, d) => { const ev = evalDay(loads, d, WH); return t + ev.nums.filter(n => ev.slots[n].status === 'bad').length; }, 0);
+  const bB = countBad(before), bA = countBad(after);
+  const outside = mine.filter(a => a.toDate && prefFit(a.vid, a.dest, a.wh, a.toDate, a.toSlot).fit === 'no').length;
+  let h = '<div class="strip">' +
+    kpi('Vendors approved', fmt(mine.length), mine.length ? fmt(mine.reduce((t, a) => t + a.pos.length, 0)) + ' POs' : 'approve in Recommendations or from any slot') +
+    kpi('Qty moved', fmt(mine.filter(a => a.toDate).reduce((t, a) => t + a.qty, 0)), outside ? '<span style="color:var(--red)">' + outside + ' outside vendor time</span>' : 'all within vendor time') +
+    kpi('Too-full slots before', fmt(bB), '', bB ? 'var(--red)' : 'var(--green)') +
+    kpi('Too-full slots after', fmt(bA), bA ? 'still needs more moves' : 'all slots within the rules', bA ? 'var(--red)' : 'var(--green)') + '</div>';
+  h += '<div class="panel"><h2>Approved moves</h2><p class="sub">Change the target or remove a vendor. The calendar below updates right away.</p>';
+  if (!mine.length) {
+    h += '<div style="color:var(--muted);padding:6px 0">Nothing approved yet for ' + esc(WH) + '. ' +
+      (RECS.moves.some(m => m.wh === WH) ? '<button class="btn small primary" data-act="approveAll">Approve all suggestions</button>' : '') + '</div>';
+  } else {
+    h += '<div style="overflow-x:auto"><table class="list"><tr><th>Vendor</th><th class="n">POs</th><th class="n">Qty</th><th>From</th><th style="min-width:300px">Move to</th><th>Vendor time</th><th></th></tr>' +
+      mine.map(a => {
+        const f = a.toDate ? prefFit(a.vid, a.dest, a.wh, a.toDate, a.toSlot) : null;
+        const tag = !f ? '<span class="tag grey">No target</span>' : f.fit === 'yes' ? '<span class="tag fit">Fits</span>' : f.fit === 'no' ? '<span class="tag nofit" title="' + esc(f.why) + '">Outside</span>' : '<span class="tag grey">Unknown</span>';
+        return '<tr><td><b>' + esc(a.vendor) + '</b>' + prefLine(prefText(a.vid, a.dest)) + '<div class="polist">' + esc(a.pos.join(', ')) + '</div></td><td class="n">' + a.pos.length + '</td><td class="n">' + fmt(a.qty) +
+          '</td><td>' + niceDate(a.date, true) + ' · Slot ' + a.fromSlot + '</td><td><select data-act="simTarget" data-id="' + a.id + '">' +
+          targetOptions(a, a.toDate ? a.toDate + '|' + a.toSlot : '').html + '</select></td><td>' + tag + '</td>' +
+          '<td><button class="btn small danger" data-act="remove" data-id="' + a.id + '">Remove</button></td></tr>';
+      }).join('') + '</table></div><div class="toolbar" style="margin:12px 0 0"><span class="txt"></span>' +
+      '<button class="btn" data-act="share">Copy share link</button><button class="btn" data-act="clearSim">Clear all</button><button class="btn" data-act="exportSimMoves">Export moves (CSV)</button>' +
+      '<button class="btn primary" data-act="exportSimCap">Export capacity after moves (CSV)</button></div>';
+  }
+  return h + '</div><div class="panel" style="padding-bottom:10px"><h2>Capacity after the approved moves</h2><p class="sub" style="margin:0">Grey text shows the % before the move; the faded bar is the old level.</p></div>' +
+    legend(true) + calendar(after, before, dates, poCounts(true));
+}
+
+function openSlot(d, n) {
+  n = Number(n);
+  const s = MODEL.slots.get(key(d, WH, n));
+  const ev = evalDay(simLoads(), d, WH).slots[n];
+  const recVks = new Set(RECS.moves.filter(m => m.date === d && m.wh === WH && m.fromSlot === n).map(m => m.vk));
+  document.getElementById('dTitle').textContent = niceDate(d, true) + ' · Slot ' + n + slotTime(WH, n, ' · ', '') + ' · ' + WH;
+  document.getElementById('dSub').innerHTML = pct(ev.util) + ' used (' + fmt(ev.load) + ' of ' + fmt(ev.cap) + ' qty' + (APPROVED.length ? ', after approved moves' : '') + ') · max allowed ' +
+    Math.round(ev.limit * 100) + '% · <span class="tag ' + ev.status + '">' + STATUS_LABEL[ev.status] + '</span>' + (ev.excess > EPS ? ' · need to move at least <b>' + fmt(ev.excess) + '</b> qty' : '');
+  const vs = s ? [...s.vendors.values()].sort((a, b) => b.qty - a.qty) : [];
+  const rec = RECS.moves.filter(m => m.date === d && m.wh === WH && m.fromSlot === n);
+  document.getElementById('dBody').innerHTML = !vs.length ? '<p style="color:var(--muted)">No POs are scheduled in this slot.</p>' :
+    '<table class="list"><tr><th>Vendor</th><th class="n">POs</th><th class="n" style="width:90px">Qty</th><th style="width:340px">Move in simulation</th></tr>' +
+    vs.map(v => {
+      const obj = { date: d, wh: WH, fromSlot: n, vk: v.vk, vid: v.vid, dest: v.dest, vendor: v.vendor, qty: v.qty, pos: v.pos };
+      const a = approvedFor(d, WH, n, v.vk), r = rec.find(m => m.vk === v.vk);
+      const def = r ? r.toDate + '|' + r.toSlot : '';
+      return '<tr><td><b>' + esc(v.vendor) + '</b> ' + (recVks.has(v.vk) ? '<span class="tag bad">Suggested</span>' : '') + (a ? ' <span class="tag acc">Approved</span>' : '') +
+        prefLine(prefText(v.vid, v.dest)) + '<div class="polist">ID ' + esc(v.vid) + ' · ' + esc(v.pos.join(', ')) + '</div></td><td class="n">' + v.pos.length + '</td><td class="n">' + fmt(v.qty) +
+        '<div class="polist" style="white-space:nowrap">' + pct(s.load ? v.qty / s.load : 0) + ' of slot</div></td><td>' +
+        (a ? '<div class="mv"><span style="font-size:12px;color:var(--muted);flex:1">→ ' + (a.toDate ? (a.toDate === d ? 'Same day' : niceDate(a.toDate, true)) + ' · Slot ' + a.toSlot : 'no target') +
+             '</span><button class="btn small danger" data-act="dUnapprove" data-vk="' + esc(v.vk) + '" data-d="' + d + '" data-n="' + n + '">Undo</button></div>'
+           : (to => '<div class="mv"><select id="ds_' + cssId(v.vk) + '"' + selAttr(to) + '>' + to.html + '</select><button class="btn small primary" data-act="dApprove" data-vk="' + esc(v.vk) + '" data-d="' + d + '" data-n="' + n + '"' + selAttr(to) + '>Move</button></div>')(targetOptions(obj, def))) +
+        '</td></tr>';
+    }).join('') + '</table>';
+  document.getElementById('drawerWrap').classList.remove('hidden');
+}
+function closeDrawer() { document.getElementById('drawerWrap').classList.add('hidden'); }
+
+/* ===================== EVENTS ===================== */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  const act = t.dataset.act;
+  if (act === 'upload') return document.getElementById('file').click();
+  if (act === 'share') return copyShareLink();
+  if (act === 'status') {
+    const s = t.dataset.s; STATUS_OFF.has(s) ? STATUS_OFF.delete(s) : STATUS_OFF.add(s);
+    if (APPROVED.length) toast('Status changed, so the simulation was reset');
+    return rebuild(false);
+  }
+  if (act === 'slot') return openSlot(t.dataset.d, t.dataset.n);
+  if (act === 'close') return closeDrawer();
+  if (act === 'approveRec') {
+    const m = RECS.moves.find(x => x.id === t.dataset.id);
+    const sel = document.querySelector('select[data-id="' + m.id + '"]').value;
+    if (!sel) return toast('Choose where to move this vendor first');
+    const [td, ts] = sel.split('|'); approve(m, td, ts); toast(m.vendor + ' approved'); return render();
+  }
+  if (act === 'unapproveRec') { const m = RECS.moves.find(x => x.id === t.dataset.id); unapprove(m.date, m.wh, m.fromSlot, m.vk); return render(); }
+  if (act === 'approveAll') {
+    let n = 0;
+    RECS.moves.filter(m => m.wh === WH).forEach(m => { if (!approvedFor(m.date, m.wh, m.fromSlot, m.vk)) { approve(m, m.toDate, m.toSlot); n++; } });
+    toast(n + ' vendor(s) approved'); return render();
+  }
+  if (act === 'remove') { APPROVED = APPROVED.filter(a => a.id !== t.dataset.id); return render(); }
+  if (act === 'clearSim') { APPROVED = APPROVED.filter(a => a.wh !== WH); return render(); }
+  if (act === 'dApprove' || act === 'dUnapprove') {
+    const d = t.dataset.d, n = Number(t.dataset.n), vk = t.dataset.vk;
+    if (act === 'dUnapprove') unapprove(d, WH, n, vk);
+    else {
+      const sel = document.getElementById('ds_' + cssId(vk)).value;
+      if (!sel) return toast('Choose where to move this vendor first');
+      const v = MODEL.slots.get(key(d, WH, n)).vendors.get(vk);
+      const [td, ts] = sel.split('|');
+      approve({ date: d, wh: WH, fromSlot: n, vk, vid: v.vid, dest: v.dest, vendor: v.vendor, qty: v.qty, pos: v.pos }, td, ts);
+      toast(v.vendor + ' added to the simulation');
+    }
+    openSlot(d, n); return render();
+  }
+  if (act === 'exportRecs') return exportRecs();
+  if (act === 'exportSimMoves') return exportSimMoves();
+  if (act === 'exportSimCap') return exportSimCap();
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'whSel') { WH = t.value; return render(); }
+  if (t.dataset.act === 'recTarget') {
+    const m = RECS.moves.find(x => x.id === t.dataset.id), a = approvedFor(m.date, m.wh, m.fromSlot, m.vk);
+    if (a) { const [td, ts] = t.value ? t.value.split('|') : ['', '']; a.toDate = td; a.toSlot = Number(ts) || ''; render(); }
+  }
+  if (t.dataset.act === 'simTarget') {
+    const a = APPROVED.find(x => x.id === t.dataset.id); const [td, ts] = t.value ? t.value.split('|') : ['', ''];
+    a.toDate = td; a.toSlot = Number(ts) || ''; render();
+  }
+});
+document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => { TAB = b.dataset.tab; render(); }));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+document.getElementById('file').addEventListener('change', e => { loadFiles(e.target.files); e.target.value = ''; });
+const dropEl = document.getElementById('drop');
+['dragover', 'dragenter'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); dropEl.classList.add('hover'); }));
+['dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); dropEl.classList.remove('hover'); }));
+document.addEventListener('drop', e => { if (e.dataTransfer.files.length) loadFiles(e.dataTransfer.files); });
+
+/* ===================== EXPORT ===================== */
+function downloadCsv(rows, name) {
+  const blob = new Blob(['﻿' + Papa.unparse(rows)], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+const fileWh = () => WH.replace(/[^\w]+/g, '_');
+const fitLabel = f => ({ yes: 'Fits', no: 'Outside', unknown: 'No preference data', nodata: 'Preference not uploaded' }[f] || '');
+function exportRecs() {
+  downloadCsv([['Date', 'Warehouse', 'From slot', 'Vendor', 'Vendor ID', 'Vendor delivery time', 'POs', 'Qty', 'Suggested date', 'Suggested slot', 'Fits vendor time', 'PO numbers']]
+    .concat(RECS.moves.filter(m => m.wh === WH).map(m => [m.date, m.wh, m.fromSlot, m.vendor, m.vid, prefText(m.vid, m.dest), m.pos.length, m.qty, m.toDate, m.toSlot, fitLabel(m.fit), m.pos.join(', ')])),
+    'suggestions_' + fileWh() + '.csv');
+}
+function exportSimMoves() {
+  downloadCsv([['Date', 'Warehouse', 'From slot', 'Vendor', 'Vendor ID', 'Vendor delivery time', 'POs', 'Qty', 'Move to date', 'Move to slot', 'Fits vendor time', 'PO numbers']]
+    .concat(APPROVED.filter(a => a.wh === WH).map(a => [a.date, a.wh, a.fromSlot, a.vendor, a.vid, prefText(a.vid, a.dest), a.pos.length, a.qty, a.toDate, a.toSlot,
+      a.toDate ? fitLabel(prefFit(a.vid, a.dest, a.wh, a.toDate, a.toSlot).fit) : '', a.pos.join(', ')])),
+    'approved_moves_' + fileWh() + '.csv');
+}
+function exportSimCap() {
+  const before = baseLoads(), after = simLoads(), rows = [['Date', 'Warehouse', 'Slot', 'Capacity', 'Load before', 'Used % before', 'Load after', 'Used % after', 'Max allowed % after', 'Status after', 'Rule after']];
+  MODEL.dates[WH].forEach(d => {
+    const eb = evalDay(before, d, WH), ea = evalDay(after, d, WH);
+    ea.nums.forEach(n => { const b = eb.slots[n], a = ea.slots[n];
+      rows.push([d, WH, n, a.cap, b.load, +(b.util * 100).toFixed(1), a.load, +(a.util * 100).toFixed(1), Math.round(a.limit * 100), STATUS_LABEL[a.status], ea.reason]); });
+  });
+  downloadCsv(rows, 'capacity_after_moves_' + fileWh() + '.csv');
+}
+
+/* ===================== HELPERS ===================== */
+function addDays(iso, n) { const p = iso.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)).toISOString().slice(0, 10); }
+function weekday(iso) { const p = iso.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay(); }
+function monthName(iso) { const p = iso.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }); }
+function fmt(n) { return Math.round(n || 0).toLocaleString('en-US'); }
+function pct(u) { return u === Infinity ? 'no capacity' : (u * 100).toFixed(1) + '%'; }
+function hhmm(m) { return pad(Math.floor(m / 60) % 24) + ':' + pad(m % 60); }
+function niceDate(iso, withDay) {
+  const p = (iso || '').split('-').map(Number);
+  if (p.length !== 3 || isNaN(p[0])) return iso || '';
+  return new Date(Date.UTC(p[0], p[1] - 1, p[2])).toLocaleDateString('en-GB', Object.assign({ day: 'numeric', month: 'short', timeZone: 'UTC' }, withDay ? { weekday: 'short' } : { year: 'numeric' }));
+}
+function slotTime(w, n, pre, post) { const t = MODEL && MODEL.win[w + '|' + n]; return t ? pre + hhmm(t.s) + '–' + hhmm(t.e) + post : ''; }
+function prettyStatus(s) { return s.replace(/^\d+\./, '').replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase()); }
+function cssId(s) { return String(s).replace(/[^\w-]/g, '_'); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+let toastT; function toast(m) { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2400); }
+renderSources();
+(async () => {
+  const t = document.getElementById('emptyTitle');
+  if (/^https?:/.test(location.protocol)) t.textContent = 'Loading shared data…';
+  if (await loadShared()) restoreState();
+  else { RESTORING = false; t.textContent = 'Upload your data'; }
+})();
+</script>
+</body>
+</html>
