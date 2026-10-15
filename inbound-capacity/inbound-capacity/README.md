@@ -1,32 +1,43 @@
 # Inbound Slot Capacity Check
 
-A one-page dashboard that checks whether each inbound slot (Slot 1, 2, 3) at each warehouse is over capacity, suggests which vendor to move, and lets you simulate the moves.
+A one-page dashboard that checks whether each inbound slot (Slot 1, 2, 3) at each warehouse breaks the capacity rules, works out which vendors to move to another slot on the same day, flags vendors that have no caphand slot, and writes a mini analysis you can download as a Word file.
 
-## How the shared data works
+## Data
 
-- The page reads `data/capacity.xlsx` from this folder every time it opens, so everyone with the link sees the same data.
-- The file needs two tabs:
-  - **Sheet1**: the inbound PO schedule from Capacity Handler (Capacity Handler Date, slot name, start_at, end_at, po_number, status, incoming_qty, Vendor ID, vendor, destination_id, destination_name, max_timeslot_po_qty).
-  - **Sheet2**: vendor delivery preference (Vendor ID, inbound days, new_inbound_hours, destination_id).
+- The page reads `data/capacity.xlsx` from this folder when it opens, so everyone with the link sees the same data. If the file is not there, upload it inside the page (that only changes your own screen).
+- The PO schedule tab needs: Capacity Handler Date, slot name, loading_dock_name, po_number, status, incoming_qty, Vendor ID, vendor, destination_name, max_timeslot_po_qty. Optional: start_at, end_at, destination_id, PO Created Date.
+- A historical FR tab (vendor_id, company_name, and one column per month such as `Sep 2026`) can sit in the same Excel file. The right-most month is used.
 
-## How to update the data
+## Historical FR
 
-1. Download the Google Sheet as Excel (.xlsx).
-2. Rename it to `capacity.xlsx`.
-3. In GitHub, open `inbound-capacity/data/`, choose **Add file → Upload files**, drop the new file in, and commit.
-4. The page shows the new data within about a minute.
+- Expected qty = incoming_qty × the vendor's historical FR. All slot checks use expected qty.
+- The page ships with FR Sep 2026. Each month, upload or paste the new FR table in the **Historical FR** tab.
+- Vendors that are not in the FR table count at 100% by default (changeable in the same tab). FR can also be switched off.
 
-Uploading a file inside the page only changes what you see on your own screen. It is not shared.
-
-## How to share approved moves
-
-Approve vendors in the Recommendations or Simulation tab, then click **Copy share link**. The link keeps the warehouse, tab, status filter and every approved move, so whoever opens it sees the same simulation.
-
-## Rules used
+## Rules
 
 - Capacity per slot = `max_timeslot_po_qty` (taken once per date × slot × warehouse, never added up).
-- Normal maximum: Slot 1 up to 125%, Slot 2 up to 133%, Slot 3 up to 125%.
-- If Slot 1 is over 100%, Slot 2 must stay at or below 100%.
-- If Slot 2 is over 100%, Slot 1 and Slot 3 must stay at or below 100%.
-- A whole vendor is moved (all its POs in that slot), never a single PO.
-- A vendor can only be moved to a day and slot that matches its inbound days and delivery hours, and only if no slot that day ends up breaking the rules.
+- A slot is full when it is above 100%.
+- If Slot 1 or Slot 3 is above 100%, Slot 2 must stay at or below 100%. If Slot 2 is above 100%, Slot 1 and Slot 3 must stay at or below 100%.
+- So each day uses one option: **Fill Slot 1 and Slot 3** (Slot 1 up to 125%, Slot 3 up to 133%) or **Fill Slot 2 only** (up to 133%).
+- Limits and links can be changed in the **Rules** tab.
+
+## How vendors are moved
+
+1. On a day that breaks the rules, every option is worked out and the one that leaves the least qty without a slot is used. Another option can be picked per day in Recommendations.
+2. Vendors are taken out from the bottom of each full slot (latest PO Created Date first, then the bottom row). All POs of the same vendor in that slot are taken out together.
+3. A taken-out vendor moves to another slot on the same day only if that slot has room within its limit.
+4. A vendor with no room anywhere that day stays in its slot and is flagged as **No caphand slot**. That day keeps breaking the rules.
+
+## Mini analysis
+
+The **Analysis** tab has the Data Scope / Key Findings / Recommendations summary, the decision framework, a per-day table, the vendors to move, the vendors without a caphand slot, and before/after calendars. Use **Download mini analysis (.docx)** or **Copy summary text**.
+
+## Sharing
+
+**Copy share link** keeps the warehouse, tab, status filter, rule settings, chosen option per day, an uploaded FR table and every approved move.
+
+## Updating the data
+
+1. Download the Google Sheet as Excel (.xlsx) and rename it to `capacity.xlsx`.
+2. In GitHub, open `inbound-capacity/inbound-capacity/data/`, choose **Add file → Upload files**, drop the file in, and commit.
